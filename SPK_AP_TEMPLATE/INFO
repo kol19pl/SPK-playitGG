@@ -1,0 +1,22 @@
+package="playit.gg"
+version="v1.0"
+description="playit.gg"
+arch="northstarplus ipq806x x86_64 armv7 armv8"  
+
+firmware="5.2-7742"
+dsmappname="SYNO.SDS.playit.gg.Application"
+maintainer="Kol19pl"
+displayname="playit.gg"
+maintainer_url="https://github.com/kol19pl/SRM-Pihole/tree/main"
+support_url="https://github.com/kol19pl/SRM-Pihole/tree/main"
+helpurl="https://github.com/kol19pl/SRM-Pihole/tree/main"
+adminport=8080
+adminurl="web"
+dsmuidir="ui"
+beta="no"
+install_replace_packages="playit.gg"
+install_conflict_packages="playit.gg"
+install_replace_force_packages="playit.gg"
+
+
+description_plk="playit.gg :)"
