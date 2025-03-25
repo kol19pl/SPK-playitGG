@@ -1,120 +1,215 @@
 #!/bin/sh
 
+# Default display name
+DNAME="${SYNOPKG_PKGNAME}"
 
+if [ "$SYNOPKG_DSM_VERSION_MAJOR" -lt 7 ]; then
+    # define SYNOPKG_PKGVAR for forward compatibility
+    SYNOPKG_PKGVAR="${SYNOPKG_PKGDEST}/var"
+fi
 
-
-
-
-# customized items of package
-if [ -z "$SYNOPKG_PKGNAME" ]; then
-	# prior DSM 3.2, start script will be run without environment variable
-	#  at boot time, thus we need a workaround to gather name and version info
-	PACKAGE_NAME="DownloadStation"
-	PACKAGE_VER=`get_key_value "/var/packages/${PACKAGE_NAME}/INFO" "version"`
-else
-	PACKAGE_NAME=$SYNOPKG_PKGNAME
-	PACKAGE_VER=$SYNOPKG_PKGVER
+# Source package specific variable and functions
+SVC_SETUP=$(dirname $0)"/service-setup"
+if [ -r "${SVC_SETUP}" ]; then
+    . "${SVC_SETUP}"
 fi
 
 
-SCRIPTSPATH="/var/packages/${PACKAGE_NAME}/target/scripts"
-APP_PATH="/usr/syno/synoman/webman/3rdparty/$PACKAGE_NAME"
-SYNO_SERVICE_TOOL="/usr/syno/sbin/synoservice"
-
-
-
-pkg_get_dsm_version() {
-	local version_file="/etc.defaults/VERSION"
-
-	if [ ! -f "$version_file" ]; then
-		echo "pkg_get_dsm_version: can not find version file '$version_file'"
-		return 1
-	fi
-	local buildnumber=`grep -s ^buildnumber ${version_file} | head -1 | awk -F \" '{print $2}' | sed 's/ //g'`
-	echo ${buildnumber}
-}
-
-DSM_BUILD_NUM=$(pkg_get_dsm_version)
-
-
-
-
-
-
-PACKAGE_DIR="/var/packages/DownloadStation"
-BIN_PATH="/var/packages/playitGG/target/bin/playit-linux"
-PID_FILE="/volume1/1/playitGG/playit.pid"
-LOG_FILE="/volume1/1/playitGG/LOG/playit.log"
-
-
-# create @download folder and service link
-	${SYNO_SERVICE_TOOL} --setshare download
-
-
-
-
-
-# Tworzenie folderu w /volume1/1/playitGG, jeśli nie istnieje
-mkdir -p /volume1/1/playitGG
-mkdir -p "$(dirname "$LOG_FILE")"
-
-# Logowanie do pliku (wszystkie stdout i stderr trafiają do LOG_FILE)
-exec > "$LOG_FILE" 2>&1
-
-echo "------------------------------------------------"
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Uruchomiono skrypt zarządzania usługą playit.gg"
-echo "------------------------------------------------"
-
-# Funkcja uruchamiająca aplikację jako demon
-start_daemon() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting playit.gg..."
-    nohup "$BIN_PATH" >> "$LOG_FILE" 2>&1 &
-    if [ $? -eq 0 ]; then
-        echo $! > "$PID_FILE"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - playit.gg started with PID $(cat "$PID_FILE")."
-    else
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Failed to start playit.gg."
+# Invoke shell function if available
+call_func ()
+{
+    FUNC=$1
+    if type "${FUNC}" 2>/dev/null | grep -q 'function' 2>/dev/null; then
+        echo "Begin ${FUNC}" >> ${LOG_FILE}
+        eval ${FUNC}         >> ${LOG_FILE}
+        echo "End ${FUNC}"   >> ${LOG_FILE}
     fi
 }
 
-# Funkcja zatrzymująca aplikację
-stop_daemon() {
-    if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE")
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Stopping playit.gg with PID $PID..."
-        kill "$PID" && rm -f "$PID_FILE"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - playit.gg stopped."
+
+start_daemon ()
+{
+    i=0
+    mkdir -p /volume1/1/playitGG
+    mkdir -p /volume1/1/playitGG/LOG
+
+    LOG_USER_FILE=/volume1/1/playitGG/LOG/run.log  # Ścieżka do pliku logów w przestrzeni użytkownika
+    mkdir -p $(dirname "$LOG_USER_FILE")  # Upewnij się, że katalog istnieje
+
+    if [ -z "${SVC_QUIET}" ]; then
+        if [ -z "${SVC_KEEP_LOG}" ]; then
+            date > ${LOG_FILE}
+        else
+            date >> ${LOG_FILE}
+        fi
+    fi
+
+    call_func "service_prestart"
+    printf "%s" "$SERVICE_COMMAND" | while read -r service || [ -n "$service" ]
+    do
+        i=$((i + 1))
+        if [ -z "${SVC_QUIET}" ]; then
+            echo "Starting ${DNAME} command ${service}" >> ${LOG_FILE}
+        fi
+        if [ -n "${service}" ]; then
+            if [ -n "${SVC_NO_REDIRECT}" ]; then
+                OUT="/dev/null"
+            else
+                OUT="${LOG_FILE}"
+            fi
+            if [ -n "${USER}" -a -n "${SYNOPKG_DSM_VERSION_MAJOR}" -a "$SYNOPKG_DSM_VERSION_MAJOR" -lt 6 ]; then
+                if [ -z "${SVC_CWD}" ]; then
+                    SVC_CD=""
+                else
+                    SVC_CD="cd ${SVC_CWD}; "
+                fi
+                if [ -n "${SYNOPKG_DSM_VERSION_MAJOR}" ] && [ "${SYNOPKG_DSM_VERSION_MAJOR}" -lt 7 ]; then
+                    SU="su ${EFF_USER} -s"
+                else
+                    SU="su"
+                fi
+                if [ -z "${SVC_BACKGROUND}" ]; then
+                    $SU /bin/sh -c "${SVC_CD}${service}" >> ${OUT} 2>&1
+                else
+                    $SU /bin/sh -c "${SVC_CD}${service}" >> ${OUT} 2>&1 &  # Zapisz logi w tle
+                fi
+            else
+                # DSM 6 user is set by conf/privilege
+                if [ -n "${SVC_CWD}" ]; then
+                    cd "${SVC_CWD}"
+                fi
+                if [ -z "${SVC_BACKGROUND}" ]; then
+                    ${service} >> ${OUT} 2>&1
+                else
+                    ${service} >> ${OUT} 2>&1 &  # Zapisz logi w tle
+                fi
+            fi
+            if [ -n "${SVC_WRITE_PID}" -a -n "${SVC_BACKGROUND}" -a -n "${PID_FILE}" ]; then
+                [ $i -eq 1 ] && echo -ne "$!" > ${PID_FILE} || echo -ne " $!" >> ${PID_FILE}
+            else
+                wait_for_status 0 ${SVC_WAIT_TIMEOUT:=20}
+            fi
+        fi
+    done
+}
+
+stop_daemon ()
+{
+    if [ -n "${PID_FILE}" -a -r "${PID_FILE}" ]; then
+        for pid in $(cat "${PID_FILE}")
+        do
+            if [ -z "${SVC_QUIET}" ]; then
+                date >> ${LOG_FILE}
+                echo "Stopping ${DNAME} service : $(ps -p${pid} -o comm=) (${pid})" >> ${LOG_FILE}
+            fi
+            kill -TERM ${pid} >> ${LOG_FILE} 2>&1
+            wait_for_status 1 ${SVC_WAIT_TIMEOUT:=20} ${pid} || kill -KILL ${pid} >> ${LOG_FILE} 2>&1
+        done
+        if [ -f "${PID_FILE}" ]; then
+            rm -f "${PID_FILE}" > /dev/null
+        fi
+    fi
+    call_func "service_poststop"
+}
+
+#------------------------------------------------------
+# daemon_status()
+#     $1: PID to check, if empty use ${PID_FILE}
+# status: Keeps track of kill -0 exit status
+#
+# Return 0 when all pid are OK, else return 1
+#------------------------------------------------------
+daemon_status ()
+{
+    status=0
+    [ -z "${1}" ] && pid_list=$(cat ${PID_FILE} 2>/dev/null) || pid_list=${1}
+    if [ -n "${pid_list}" ]; then
+        for pid in ${pid_list}
+        do
+           kill -0 ${pid} > /dev/null 2>&1
+           let status=$status+$?
+        done
+        if [ $status -ne 0 ]; then
+           rm -f "${PID_FILE}" > /dev/null
+           return 1
+        else
+           return 0
+        fi
     else
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - playit.gg is not running."
+        return 1
     fi
 }
 
-# Funkcja sprawdzająca status aplikacji
-status_daemon() {
-    if pgrep -f "$BIN_PATH" > /dev/null; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - playit.gg is running."
-        exit 0
-    else
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - playit.gg is not running."
-        exit 1
-    fi
+#------------------------------------------------------
+# wait_for_status()
+#      $1: expected return from daemon_status() call
+#      $2: timeout (e.g. number of loop to be done)
+#      $3: PID to check being passed to daemon_status()
+# counter: Number of 1sec iteration to wait until
+#          the return value from daemon_status()
+#          match expected value
+#
+# Wait for a duration of $counter seconds for the
+# return value from daemon_status().  If it match
+# return 0 else return 1 if wait time is over.
+#------------------------------------------------------
+wait_for_status ()
+{
+    # default value: 20 seconds
+    counter=${2}
+    counter=${counter:=20}
+    while [ ${counter} -gt 0 ]; do
+        daemon_status ${3}
+        [ $? -eq $1 ] && return
+        let counter=counter-1
+        sleep 1
+    done
+    return 1
 }
 
-# Sprawdzanie argumentów i wywoływanie odpowiednich funkcji
-case "$1" in
+case $1 in
     start)
-        start_daemon ;;
+        if daemon_status; then
+            echo "${DNAME} is already running" >> ${LOG_FILE}
+            exit 0
+        else
+            echo "Starting ${DNAME} ..." >> ${LOG_FILE}
+            start_daemon
+            exit $?
+        fi
+        ;;
     stop)
-        stop_daemon ;;
+        if daemon_status; then
+            echo "Stopping ${DNAME} ..." >> ${LOG_FILE}
+            stop_daemon
+            exit $?
+        else
+            echo "${DNAME} is not running" >> ${LOG_FILE}
+            exit 0
+        fi
+        ;;
     status)
-        status_daemon ;;
-    restart)
-        stop_daemon
-        start_daemon ;;
+        if daemon_status; then
+            echo "${DNAME} is running"
+            exit 0
+        else
+            echo "${DNAME} is not running"
+            exit 3
+        fi
+        ;;
+    log)
+        # log output for DSM < 6
+        if [ -n "${LOG_FILE}" -a -r "${LOG_FILE}" ]; then
+            # Shorten long logs to last 100 lines
+            TEMP_LOG_FILE="${SYNOPKG_PKGVAR}/${SYNOPKG_PKGNAME}_temp.log"
+            # Clear any previous log
+            echo "Full log: ${LOG_FILE}" > "${TEMP_LOG_FILE}"
+            tail -n100 "${LOG_FILE}" >> "${TEMP_LOG_FILE}"
+            echo "${TEMP_LOG_FILE}"
+        fi
+        exit 0
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}" ;;
+        exit 1
+        ;;
 esac
-
-exit 0
-
-

@@ -1,0 +1,258 @@
+#!/bin/sh
+
+# DSM 5 -> 6 upgrade path:
+# - Not supported anymore
+
+# Temp. INST_LOG for DSM < 6
+# Package-specific install scripts must not use INST_LOG
+INST_LOG="${SYNOPKG_PKGDEST}/var/${SYNOPKG_PKGNAME}_install.log"
+INST_LOG_TEMP="/tmp/${SYNOPKG_PKGNAME}_install.log"
+
+# Optional FWPORTS file
+FWPORTS_FILE="/var/packages/${SYNOPKG_PKGNAME}/target/app/${SYNOPKG_PKGNAME}.sc"
+
+# Versions lower than DSM 6 don't support an upgrade folder
+# Hard coded DSM 5 temp upgrade folder for migration
+TMP_DIR="/var/tmp/${SYNOPKG_PKGNAME}/var"
+
+install_log ()
+{
+    local _msg_="$@"
+    if [ -z "${_msg_}" ]; then
+        # Read multiline from stdin
+        while IFS=$'\n' read -r line; do
+            install_log "${line}"
+        done
+    else
+        echo -e "$(date +'%Y/%m/%d %H:%M:%S')\t${_msg_}" >> ${INST_LOG_TEMP} 2>&1
+    fi
+}
+
+# Invoke shell function if available
+# DSM < 6 do not support user notifications by stdout
+call_func ()
+{
+    FUNC=$1
+    if type "${FUNC}" 2>/dev/null | grep -q 'function' 2>/dev/null; then
+        install_log "Begin ${FUNC}"
+        ARG=$2
+        if [ -z "${ARG}" ]; then
+            eval ${FUNC} 2>&1 | install_log
+        else
+            eval ${FUNC} ${ARG} 2>&1 | install_log
+        fi
+        install_log "End ${FUNC}"
+    fi
+}
+
+# Source installer functions
+INST_FUNCTIONS="$(dirname $0)/functions"
+if [ -r "${INST_FUNCTIONS}" ]; then
+    . "${INST_FUNCTIONS}"
+fi
+
+# Source package specific functions (np. service-setup)
+SVC_SETUP="$(dirname $0)/service-setup"
+if [ -r "${SVC_SETUP}" ]; then
+    . "${SVC_SETUP}"
+fi
+
+# Init variables either from package or from wizard
+call_func "initialize_variables"
+
+### Functions library
+
+# Remove user from system and from groups it is member of
+syno_remove_user ()
+{
+    RM_USER=$1
+    if [ -n "${RM_USER}" ]; then
+        # Check if user exists
+        if synouser --get "${RM_USER}" &> /dev/null; then
+            echo "Removing user ${RM_USER}"
+            synouser --del "${RM_USER}"
+            synouser --rebuild all
+            # Also rebuild groups so users are removed
+            synogroup --rebuild all
+        fi
+    fi
+}
+
+# Create syno group $GROUP with parameter user as member
+syno_group_create ()
+{
+    EFF_USER=$1
+    if [ -n "${EFF_USER}" ]; then
+        echo "Creating group ${GROUP}"
+        # Create syno group
+        synogroup --add "${GROUP}" "${EFF_USER}"
+        # Set description of the syno group
+        synogroup --descset "${GROUP}" "${GROUP_DESC}"
+    fi
+}
+
+# Delete syno group if empty
+syno_group_remove ()
+{
+    RM_GROUP=$1
+    if [ -n "${RM_GROUP}" ]; then
+        # Check if syno group is empty
+        if ! synogroup --get "${RM_GROUP}" | grep -q "0:\["; then
+            echo "Removing group ${RM_GROUP}"
+            # Remove syno group
+            synogroup --del "${RM_GROUP}"
+            synogroup --rebuild all
+        fi
+    fi
+}
+
+# Add user to existing group
+syno_user_add_to_group ()
+{
+    ADD_USER=$1
+    ADD_GROUP=$2
+    # Check if user is already in group
+    if ! synogroup --get "$ADD_GROUP" | grep "^[0-9]:\[${ADD_USER}\]" &> /dev/null; then
+        echo "Adding '${ADD_USER}' to '${ADD_GROUP}'"
+        MEMBERS="$(synogroup --get $ADD_GROUP | grep '^[0-9]' | sed 's/.*\[\([^]]*\)].*/\1/' | tr '\n' ' ')"
+        synogroup --member "$ADD_GROUP" $MEMBERS "${ADD_USER}"
+    fi
+}
+
+# Sets recursive permissions for ${GROUP} on specified directory
+set_syno_permissions ()
+{
+    DIRNAME=$(realpath "${1}")
+    GROUP="${2}"
+
+    VOLUME=$(echo "${DIRNAME}" | awk -F/ '{print "/"$2}')
+
+    if [ "$(echo ${VOLUME} | cut -c2-7)" = "volume" ]; then
+        if [ ! "$(synoacltool -get ${DIRNAME} | grep ""group:${GROUP}:allow:rwxpdDaARWcC-:fd--"")" ]; then
+            if [ "$(synoacltool -get ${DIRNAME} | grep -i 'Linux mode')" ]; then
+                set_unix_permissions "${DIRNAME}"
+                synoacltool -add "${DIRNAME}" "group:administrators:allow:rwxpdDaARWc--:fd--"
+            fi
+
+            echo "Granting '${GROUP}' group permissions on ${DIRNAME}"
+            synoacltool -add "${DIRNAME}" "group:${GROUP}:allow:rwxpdDaARWcC-:fd--"
+            find "${DIRNAME}" -type d -exec synoacltool -enforce-inherit "{}" \;
+        fi
+
+        while [ "${DIRNAME}" != "${VOLUME}" ]; do
+            if [ ! "$(synoacltool -get ""${DIRNAME}"" | grep ""group:${GROUP}:allow:r.x"")" ]; then
+                if [ "$(synoacltool -get ""${DIRNAME}"" | grep -i 'Linux mode')" ]; then
+                    synoacltool -add "${DIRNAME}" "group:administrators:allow:rwxpdDaARWc--:fd--"
+                fi
+                echo "Granting '${GROUP}' group basic permissions on ${DIRNAME}"
+                synoacltool -add "${DIRNAME}" "group:${GROUP}:allow:r-x---a-R----:---n"
+            fi
+            DIRNAME="$(dirname "${DIRNAME}")"
+        done
+    else
+        echo "Skip granting '${GROUP}' group permissions on ${DIRNAME} as the directory does not reside in '/volumeX'. Set manually if needed."
+    fi
+}
+
+# Set recursive permissions using chown
+set_unix_permissions ()
+{
+    DIRNAME=$1
+    if [ -n "${EFF_USER}" ]; then
+        echo "Granting '${EFF_USER}' unix ownership on ${DIRNAME}"
+        chown -R ${EFF_USER}:root "${DIRNAME}"
+    fi
+}
+
+# If package was moved to new group, add the new package user to the legacy group if needed.
+syno_user_add_to_legacy_group () {
+    NEW_USER=$1
+    LEGACY_USER=$2
+    LEGACY_GROUP=$3
+
+    if synogroup --get "$LEGACY_GROUP" | grep "^[0-9]:\[${LEGACY_USER}\]" &> /dev/null; then
+        echo "Adding '${NEW_USER}' to '${LEGACY_GROUP}' for backwards compatibility"
+        MEMBERS="$(synogroup --get $LEGACY_GROUP | grep '^[0-9]' | sed 's/.*\[\([^]]*\)].*/\1/' | tr '\n' ' ')"
+        MEMBERS=${MEMBERS//$LEGACY_USER}
+        synogroup --member "$LEGACY_GROUP" $MEMBERS "${NEW_USER}"
+    fi
+}
+
+### Generic package behaviors
+
+preinst ()
+{
+    log_step "preinst"
+    call_func "validate_preinst"
+    call_func "service_preinst"
+
+    exit 0
+}
+
+postinst ()
+{
+    log_step "postinst"
+
+    $LN "${SYNOPKG_PKGDEST}" "/usr/local/${SYNOPKG_PKGNAME}" 2>&1 | install_log
+    $LN "${SYNOPKG_PKGDEST}/var" "/var/packages/${SYNOPKG_PKGNAME}/var" 2>&1 | install_log
+
+    if [ -r "${FWPORTS_FILE}" ]; then
+        install_log "Installing service configuration ${FWPORTS_FILE}"
+        servicetool --install-configure-file --package "${FWPORTS_FILE}" 2>&1 | install_log
+    fi
+
+    if [ -n "${EFF_USER}" ]; then
+        if ! cat /etc/passwd | grep "${EFF_USER}:x:" &> /dev/null; then
+            synouser --add "${EFF_USER}" "" "$USER_DESC" 0 "" 0 2>&1 | install_log
+            BACKUP_PASSWD="/tmp/install_${SYNOPKG_PKGNAME}_passwd"
+            cp /etc/passwd ${BACKUP_PASSWD} 2>&1 | install_log
+            sed -i "s#/var/services/homes/${EFF_USER}#/var/packages/${SYNOPKG_PKGNAME}/target#" /etc/passwd 2>&1 | install_log
+        fi
+        if [ "$ADD_USER_IN_USERS" = "yes" ]; then
+            syno_user_add_to_group "${EFF_USER}" "users" 2>&1 | install_log
+        fi
+    fi
+
+    if [ -n "$GROUP" ]; then
+        if ! synogroup --get "$GROUP" &> /dev/null; then
+            syno_group_create "${EFF_USER}" 2>&1 | install_log
+        fi
+        if synogroup --get "$GROUP" &> /dev/null; then
+            syno_user_add_to_group "${EFF_USER}" "${GROUP}" 2>&1 | install_log
+        fi
+        synogroup --rebuild all 2>&1 | install_log
+    fi
+
+    if [ -n "${SHARE_PATH}" ]; then
+        if ! synoshare --get "${SHARE_NAME}" > /dev/null 2>&1; then
+            SHARE_PATH=${SYNOPKG_PKGDEST_VOL}/${SHARE_NAME}
+            install_log "Create share SHARE_NAME=${SHARE_NAME}, SHARE_PATH=${SHARE_PATH}"
+            synoshare --add "${SHARE_NAME}" "Share created for package ${SYNOPKG_PKGNAME}" "${SHARE_PATH}" "" "" "" 1 0 2>&1 | install_log
+        else
+            install_log "Share already exists SHARE_NAME=${SHARE_NAME}, SHARE_PATH=${SHARE_PATH}"
+        fi
+
+        if [ -z "$GROUP" ] && [ -n "${EFF_USER}" ]; then
+            _synoshare_parameter="--getmap"
+            if synoshare --getmap "${SHARE_NAME}" | grep "ACL.*\[yes\]" > /dev/null 2>&1; then
+                _synoshare_parameter="--list_acl"
+            fi
+            if synoshare ${_synoshare_parameter} "${SHARE_NAME}" | grep "RW list" | grep -o "\[.*\]"  | sed  's/[\[,]/ /g' | sed 's/\]/ /g' | grep -q " ${EFF_USER} " > /dev/null 2>&1; then
+                install_log "User has already RW access to share: SHARE_NAME=${SHARE_NAME}, EFF_USER=${EFF_USER}"
+            else
+                install_log "Set user for share: SHARE_NAME=${SHARE_NAME}, EFF_USER=${EFF_USER}"
+                synoshare --setuser "${SHARE_NAME}" RW + "${EFF_USER}" 2>&1 | install_log
+            fi
+        fi
+        synoshare --build 2>&1 | install_log
+
+        # Remove old share with previous version (if any)
+        if [ -r "${SHARE_PATH}/var" ] && [ -d "${SHARE_PATH}/var" ]; then
+            install_log "Removing old share ${SHARE_PATH}"
+            rm -rf "${SHARE_PATH}/var" 2>&1 | install_log
+        fi
+    fi
+
+    exit 0
+}
+
