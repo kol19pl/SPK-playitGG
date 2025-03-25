@@ -1,3 +1,4 @@
 #!/bin/sh
 echo "service-setup executed"
+echo "service-setup executed" >> /var/log/service-setup.log
 exit 0

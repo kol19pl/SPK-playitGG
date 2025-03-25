@@ -49,7 +49,12 @@ echo "ℹ Ustawiono uprawnienia do wykonywania dla install.sh."
 
 # Create package.tgz
 echo "📦 Tworzenie archiwum package.tgz..."
-tar -czf "$workDir/package.tgz" -C "$workDir/package" .
+echo "Zawartość $workDir/package przed pakowaniem:"
+ls -la "$workDir/package"
+cd "$workDir/package"
+tar -czf "$workDir/package.tgz" *
+cd ..
+cd ..
 
 # Create final .spk package
 outputFile=$(pwd)/${packageName}.spk

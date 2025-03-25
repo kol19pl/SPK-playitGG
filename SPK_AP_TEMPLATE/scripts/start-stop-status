@@ -4,8 +4,10 @@ BIN_PATH="/var/packages/playitGG/target/bin/playit-linux"
 PID_FILE="/var/packages/playitGG/target/playit.pid"
 LOG_FILE="/var/packages/playitGG/target/playit.log"
 
-exec > $LOG_FILE 2>&1  # Logowanie do pliku
+# Logowanie do pliku
+exec > "$LOG_FILE" 2>&1
 
+# Funkcja uruchamiająca aplikację jako demon
 start_daemon() {
     echo "Starting playit.gg..."
     nohup "$BIN_PATH" > "$LOG_FILE" 2>&1 &
@@ -17,6 +19,7 @@ start_daemon() {
     fi
 }
 
+# Funkcja zatrzymująca aplikację
 stop_daemon() {
     if [ -f "$PID_FILE" ]; then
         kill $(cat "$PID_FILE") && rm -f "$PID_FILE"
@@ -26,6 +29,7 @@ stop_daemon() {
     fi
 }
 
+# Funkcja sprawdzająca status aplikacji
 status_daemon() {
     if pgrep -f "$BIN_PATH" > /dev/null; then
         echo "playit.gg is running."
@@ -36,6 +40,7 @@ status_daemon() {
     fi
 }
 
+# Sprawdzanie argumentów i wywoływanie odpowiednich funkcji
 case "$1" in
     start) start_daemon ;;
     stop) stop_daemon ;;
