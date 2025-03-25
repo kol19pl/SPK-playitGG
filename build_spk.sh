@@ -1,89 +1,62 @@
-
 #!/bin/bash
 set -e
 
-# Check if SPK_AP_TEMPLATE folder exists
-if [ -d "SPK_AP_TEMPLATE" ]; then
-    # Use INFO file from SPK_AP_TEMPLATE folder
-    cp "SPK_AP_TEMPLATE/INFO" "$workDir/"
-    cp -R "SPK_AP_TEMPLATE/scripts" "$workDir/"
-    cp -R "SPK_AP_TEMPLATE/WIZARD_UIFILES" "$workDir/"
-    cp -R "SPK_AP_TEMPLATE/conf" "$workDir/"
-  #  cp -R "SPK_AP_TEMPLATE/ui" "$workDir/"
-    
-else
-    echo "ℹ SPK_AP_TEMPLATE folder not found. Please create it with the required INFO file and re-run this script."
+# Katalog roboczy dla budowy pakietu (tymczasowy)
+workDir=$(pwd)/_build
+rm -rf "$workDir"
+mkdir -p "$workDir"
+
+# Check if SPK_AP_TEMPLATE exists
+if [ ! -d "SPK_AP_TEMPLATE" ]; then
+    echo "ℹ SPK_AP_TEMPLATE folder not found. Please create it with the required INFO file."
     exit 1
 fi
 
 # Read package name from INFO file
-packageName=$(grep '^package=' "$workDir/INFO" | cut -d'=' -f2 | sed 's/"//g' | tr -d ' ')
+packageName=$(grep '^package=' "SPK_AP_TEMPLATE/INFO" | cut -d'=' -f2 | sed 's/"//g' | tr -d ' ')
 
-# Katalog roboczy dla budowy pakietu (tymczasowy)
-workDir=$(pwd)/_build
-
-# Usunięcie starego katalogu roboczego (jeśli istnieje) i stworzenie nowej struktury
-rm -rf "$workDir"
-mkdir -p "$workDir"
-
-# Copy INFO file to working directory
-cp "SPK_AP_TEMPLATE/INFO" "$workDir/"
-cp -R "SPK_AP_TEMPLATE/scripts" "$workDir/"
-cp -R "SPK_AP_TEMPLATE/WIZARD_UIFILES" "$workDir/"
-cp -R "SPK_AP_TEMPLATE/conf" "$workDir/"
-#cp -R "SPK_AP_TEMPLATE/ui" "$workDir/"
+# Copy necessary files
+cp -R SPK_AP_TEMPLATE/{INFO,service-cfg,scripts,conf} "$workDir/"
 
 echo "ℹ Skrypty startowe skopiowane"
 
-if [ -f "SPK_AP_TEMPLATE/PACKAGE_ICON.PNG" ]; then
-cp "SPK_AP_TEMPLATE/PACKAGE_ICON.PNG" "$workDir/"
-cp "SPK_AP_TEMPLATE/PACKAGE_ICON_256.PNG" "$workDir/"
-echo "ℹ Ikonki skopiowane"
+# Copy icons if they exist
+for icon in SPK_AP_TEMPLATE/PACKAGE_ICON*.PNG; do
+    [ -f "$icon" ] && cp "$icon" "$workDir/"
+done
+
+# Copy install.sh to the package structure
+if [ -f "SPK_AP_TEMPLATE/install.sh" ]; then
+    cp "SPK_AP_TEMPLATE/install.sh" "$workDir/"
+    echo "ℹ Plik install.sh skopiowany do struktury pakietu."
 else
-    echo "ℹ Brak ikon"
+    echo "⚠ Plik install.sh nie znaleziony! Upewnij się, że plik jest obecny w katalogu SPK_AP_TEMPLATE."
 fi
 
-
-# Tworzenie struktury katalogów
+# Create package structure
 mkdir -p "$workDir/package"
+cp -r SPK_AP_TEMPLATE/pakiet/. "$workDir/package"
 
+# Set executable permissions
+chown -R root:root "$workDir/scripts/"
+chown -R root:root "$workDir/package/"
+chmod -R +x "$workDir/scripts/"
+chmod -R +x "$workDir/package/"
 
-# Klonowanie repozytorium do tymczasowego katalogu roboczego
-#repoDir="$workDir/pi-hole-repo"
-#echo "⬇ Klonowanie repozytorium $packageName..."
-#git clone https://github.com/pi-hole/pi-hole.git "$repoDir"
+# Set executable permission for install.sh
+chmod +x "$workDir/install.sh"
+echo "ℹ Ustawiono uprawnienia do wykonywania dla install.sh."
 
-# Kopiowanie tylko wymaganych plików z repozytorium do katalogu target
-echo "📂 Kopiowanie plików do package..."
-cp -r "SPK_AP_TEMPLATE/pakiet/" "$workDir/package"
-
-
-
-
-
-# Ustawienie uprawnień wykonywalności dla skryptów
-chmod +x "$workDir/scripts/"
-
-# Tworzenie archiwum .tgz z plikami pakietu
-echo "📦 Tworzenie archiwum tar.gz (package.tgz)..."
-#cp -R "SPK_AP_TEMPLATE/pakiet" "$workDir/package"
+# Create package.tgz
+echo "📦 Tworzenie archiwum package.tgz..."
 tar -czf "$workDir/package.tgz" -C "$workDir/package" .
 
-# Tworzenie finalnego pliku .spk, zawierającego INFO oraz package.tgz
+# Create final .spk package
 outputFile=$(pwd)/${packageName}.spk
 echo "📦 Tworzenie pakietu .spk: $outputFile"
+
 cd "$workDir"
-
-if [ -f ""$workDir"/PACKAGE_ICON.PNG" ]; then
-
-echo "ℹ Ikonki są"
-tar -cf "$outputFile" INFO package.tgz scripts/ WIZARD_UIFILES/ conf/  PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG
-
-else
-    echo "ℹ Brak ikon"
-    tar -cf "$outputFile" INFO package.tgz scripts/  WIZARD_UIFILES/ conf/
-fi
-
-
+tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ conf/ install.sh $(ls PACKAGE_ICON*.PNG 2>/dev/null)
 
 echo "✅ Pakiet utworzony: $outputFile"
+rm -rf "$workDir"

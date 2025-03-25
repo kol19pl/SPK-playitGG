@@ -1,22 +1,29 @@
-package="playit.gg"
-version="v1.0"
+package=playitGG
+version=v1.1
+os_min_ver="1.0-40000"
+os_max_ver="8.2.2-70000"
 description="playit.gg"
-arch="northstarplus ipq806x x86_64 armv7 armv8"  
-
-firmware="5.2-7742"
+arch="x86_64 armv7 armv8 ipq806x northstarplus"
+version_installer="1.0"
 dsmappname="SYNO.SDS.playit.gg.Application"
 maintainer="Kol19pl"
+startable="yes"
+install_path="/volume1/@appstore/playitGG"
 displayname="playit.gg"
 maintainer_url="https://github.com/kol19pl/SRM-Pihole/tree/main"
 support_url="https://github.com/kol19pl/SRM-Pihole/tree/main"
 helpurl="https://github.com/kol19pl/SRM-Pihole/tree/main"
-adminport=8080
-adminurl="web"
-dsmuidir="ui"
 beta="no"
-install_replace_packages="playit.gg"
-install_conflict_packages="playit.gg"
-install_replace_force_packages="playit.gg"
+install_replace_packages="playitGG"
+install_conflict_packages="playitGG"
+install_replace_force_packages="playitGG"
+silent_install="no"
+depends=""
+log_dir="/var/log/playitgg"
+user="root"
+group="administrators"
+post_install_message="Instalacja zakończona pomyślnie!"
 
 
 description_plk="playit.gg :)"
+
