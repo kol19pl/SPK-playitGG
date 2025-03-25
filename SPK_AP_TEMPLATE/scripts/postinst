@@ -1,3 +1,28 @@
 #!/bin/sh
-. $(dirname $0)/installer
-$(basename $0) > $SYNOPKG_TEMP_LOGFILE
+# Copyright (C) 2000-2020 Synology Inc. All rights reserved.
+
+### This script will be executed when package installed and upgraded.
+### Actions after package installed.
+### ex. create database, create symbolic link...
+#!/bin/sh
+
+echo "Post-install script running..."
+
+# Utwórz foldery jeśli nie istnieją
+INSTALL_DIR="/var/packages/playit/target"
+BIN_DIR="$INSTALL_DIR/bin"
+VAR_DIR="$INSTALL_DIR/var"
+
+mkdir -p "$BIN_DIR"
+mkdir -p "$VAR_DIR"
+
+# Ustawienia uprawnień
+chmod +x "$BIN_DIR/playit-linux-amd64"
+
+# Zakończ sukcesem
+exit 0
+
+
+
+
+

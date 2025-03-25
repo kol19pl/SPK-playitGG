@@ -1,7 +1,7 @@
 package=playitGG
 version=v1.1
 os_min_ver="1.0-40000"
-os_max_ver="8.2.2-70000"
+os_max_ver="7.2-70000"
 description="playit.gg"
 arch="x86_64 armv7 armv8 ipq806x northstarplus"
 version_installer="1.0"
@@ -17,16 +17,14 @@ beta="no"
 install_replace_packages="playitGG"
 install_conflict_packages="playitGG"
 install_replace_force_packages="playitGG"
-silent_install="no"
-depends=""
+
+
 log_dir="/var/log/playitgg"
 user="root"
 group="administrators"
 post_install_message="Instalacja zakończona pomyślnie!"
-silent_install="yes"
-silent_upgrade="yes"
-silent_uninstall="yes"
-support_aaprofile="yes"
+
+
 allow_altport="true"
 
 sdkmodversion="1.0"
