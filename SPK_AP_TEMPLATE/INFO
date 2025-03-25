@@ -23,7 +23,14 @@ log_dir="/var/log/playitgg"
 user="root"
 group="administrators"
 post_install_message="Instalacja zakończona pomyślnie!"
+silent_install="yes"
+silent_upgrade="yes"
+silent_uninstall="yes"
+support_aaprofile="yes"
+allow_altport="true"
 
+sdkmodversion="1.0"
+toolkit_version="9352"
 
 description_plk="playit.gg :)"
 
