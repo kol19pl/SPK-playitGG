@@ -10,16 +10,14 @@ fi
 USER="playitGG"
 EFF_USER="sc-playitGG"
 
-
-# define SYNOPKG_PKGVAR for compatibility with DSM7
+# Define SYNOPKG_PKGVAR for compatibility with DSM7
 SYNOPKG_PKGVAR="${SYNOPKG_PKGDEST}/var"
 
-# start-stop-status script redirect stdout/stderr to LOG_FILE
+# Start-stop-status script redirect stdout/stderr to LOG_FILE
 LOG_FILE="${SYNOPKG_PKGVAR}/${SYNOPKG_PKGNAME}.log"
 
 # Service command has to deliver its pid into PID_FILE
 PID_FILE="${SYNOPKG_PKGVAR}/${SYNOPKG_PKGNAME}.pid"
-
 
 ### Package specific variables and functions
 ### ----------------------------------------
@@ -27,36 +25,46 @@ PID_FILE="${SYNOPKG_PKGVAR}/${SYNOPKG_PKGNAME}.pid"
 TOKEN_FILE="${SYNOPKG_PKGVAR}/token"
 CONFIG_FILE="${SYNOPKG_PKGVAR}/config.yml"
 
-#SERVICE_COMMAND="${SYNOPKG_PKGDEST}/bin/playit-linux tunnel --config ${SYNOPKG_PKGVAR}/config.yml run"
-SERVICE_COMMAND="${SYNOPKG_PKGDEST}/bin/playit-linux ${SYNOPKG_PKGVAR}/config.yml run"
+# Ensure necessary directories exist
+mkdir -p "${SYNOPKG_PKGVAR}"
+
+# Service command 
+SERVICE_COMMAND="${SYNOPKG_PKGDEST}/bin/playit-linux run"
 SVC_BACKGROUND=y
 SVC_WRITE_PID=y
 
 service_postinst() 
 {
-    if [ "${SYNOPKG_PKG_STATUS}" == "INSTALL" ]; then
-
-        # Populate config template
-        sed -i -e "s|@token@|${wizard_cloudflared_token}|g" \
-            -e "s|@management-diagnostics@|${wizard_management_diagnostics}|g" \
-            -e "s|@post-quantum@|${wizard_pq}|g" \
-            -e "s|@edge-ip-version@|${wizard_edge_ip_version}|g" \
-            ${CONFIG_FILE}
-
+    echo "Running post-installation steps..." >> $LOG_FILE
+    if [[ "${SYNOPKG_PKG_STATUS}" == "INSTALL" ]]; then
+        if [ -e "${CONFIG_FILE}" ]; then
+            # Populate config template
+            sed -i -e "s|@token@|${wizard_cloudflared_token}|g" \
+                   -e "s|@management-diagnostics@|${wizard_management_diagnostics}|g" \
+                   -e "s|@post-quantum@|${wizard_pq}|g" \
+                   -e "s|@edge-ip-version@|${wizard_edge_ip_version}|g" \
+                   ${CONFIG_FILE}
+            echo "Configuration file populated." >> $LOG_FILE
+        else
+            echo "Error: Config file not found at ${CONFIG_FILE}" >> $LOG_FILE
+        fi
     fi
 }
 
 service_postupgrade() 
 {
+    echo "Uruchamiam setuap-po apgrejdzie" >> $LOG_FILE
     # Migrate from token file if exists
-    if [ -e $TOKEN_FILE ]; then
-        echo "Migrate token into ${CONFIG_FILE} and delete ${TOKEN_FILE}"
-        CLOUDFLARED_TOKEN="$(cat $TOKEN_FILE)"
-        rm -f $TOKEN_FILE
-        sed -i -e "s|@token@|${CLOUDFLARED_TOKEN}|g" \
-            -e "s|@management-diagnostics@|false|g" \
-            -e "s|@post-quantum@|false|g" \
-            -e "s|@edge-ip-version@|4|g" \
-            ${CONFIG_FILE}
+     # if [ -e "$TOKEN_FILE" ]; then
+     #   echo "Migrating token into ${CONFIG_FILE} and deleting ${TOKEN_FILE}" >> $LOG_FILE
+     #   CLOUDFLARED_TOKEN="$(cat $TOKEN_FILE)"
+     #   rm -f $TOKEN_FILE
+     #   sed -i -e "s|@token@|${CLOUDFLARED_TOKEN}|g" \
+      #         -e "s|@management-diagnostics@|false|g" \
+      #         -e "s|@post-quantum@|false|g" \
+      #         -e "s|@edge-ip-version@|4|g" \
+       #        ${CONFIG_FILE}
+        echo "Token migration complete." >> $LOG_FILE
     fi
 }
+
