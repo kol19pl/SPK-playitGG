@@ -29,7 +29,8 @@ CONFIG_FILE="${SYNOPKG_PKGVAR}/config.yml"
 mkdir -p "${SYNOPKG_PKGVAR}"
 
 # Service command 
-SERVICE_COMMAND="${SYNOPKG_PKGDEST}/bin/playit-linux run"
+secret_key="c113ce3d302ac279f60912ceae77c31d686179b3462073dc3f71ac6ed84e090f"
+SERVICE_COMMAND="${SYNOPKG_PKGDEST}/bin/playit-linux start --secret $secret_key"
 SVC_BACKGROUND=y
 SVC_WRITE_PID=y
 
@@ -40,9 +41,9 @@ service_postinst()
         if [ -e "${CONFIG_FILE}" ]; then
             # Populate config template
             sed -i -e "s|@token@|${wizard_cloudflared_token}|g" \
-                   -e "s|@management-diagnostics@|${wizard_management_diagnostics}|g" \
-                   -e "s|@post-quantum@|${wizard_pq}|g" \
-                   -e "s|@edge-ip-version@|${wizard_edge_ip_version}|g" \
+                 #  -e "s|@management-diagnostics@|${wizard_management_diagnostics}|g" \
+                 #  -e "s|@post-quantum@|${wizard_pq}|g" \
+                 #  -e "s|@edge-ip-version@|${wizard_edge_ip_version}|g" \
                    ${CONFIG_FILE}
             echo "Configuration file populated." >> $LOG_FILE
         else
