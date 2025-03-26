@@ -1,3 +1,101 @@
 #!/bin/sh
-. $(dirname $0)/installer
-$(basename $0) > $SYNOPKG_TEMP_LOGFILE
+
+# Exit on error
+set -e
+
+# Source service-setup script to access shared functions and variables
+. "$(dirname "$0")/service-setup"
+
+# Main preuninst function
+preuninst_main() {
+    install_log "INFO" "Starting pre-uninstallation procedure for ${PACKAGE}"
+    
+    # Check if service is running and stop it safely
+    if service_status; then
+        install_log "INFO" "PlayIt.GG service is running, stopping it"
+        service_stop || {
+            install_log "ERROR" "Failed to stop ${PACKAGE} service"
+            exit 1
+        }
+        
+        # Wait for service to fully stop
+        local timeout=30
+        local count=0
+        while service_status && [ $count -lt $timeout ]; do
+            install_log "INFO" "Waiting for service to stop... (${count}/${timeout})"
+            sleep 1
+            count=$((count + 1))
+        done
+        
+        if service_status; then
+            install_log "WARNING" "Service did not stop within timeout period, proceeding anyway"
+        else
+            install_log "INFO" "Service stopped successfully"
+        fi
+    else
+        install_log "INFO" "PlayIt.GG service is not running, no need to stop"
+    fi
+    
+    # Backup user configuration if it exists
+    backup_user_data || {
+        install_log "ERROR" "Failed to backup user data"
+        exit 1
+    }
+    
+    install_log "INFO" "Pre-uninstallation completed successfully"
+    exit 0
+}
+
+# Backup user data function
+backup_user_data() {
+    install_log "INFO" "Checking for user data to backup"
+    
+    # Only backup if CONFIG_DIR exists and has content
+    if [ -d "${CONFIG_DIR}" ] && [ "$(ls -A "${CONFIG_DIR}" 2>/dev/null)" ]; then
+        install_log "INFO" "Found user configuration, creating backup"
+        
+        # Create backup directory if it doesn't exist
+        local backup_dir="${SYNOPKG_PKGDEST}/../${PACKAGE}_backup"
+        ensure_dir "${backup_dir}" || {
+            install_log "ERROR" "Failed to create backup directory at ${backup_dir}"
+            return 1
+        }
+        
+        # Backup the current configuration
+        local timestamp=$(date +"%Y%m%d_%H%M%S")
+        local backup_file="${backup_dir}/${PACKAGE}_config_${timestamp}.tar.gz"
+        
+        install_log "INFO" "Backing up configuration to ${backup_file}"
+        tar -czf "${backup_file}" -C "${CONFIG_DIR}" . 2>/dev/null || {
+            install_log "ERROR" "Failed to create backup archive"
+            return 1
+        }
+        
+        # Backup the token file separately if it exists
+        if [ -f "${TOKEN_FILE}" ]; then
+            install_log "INFO" "Backing up token file"
+            cp "${TOKEN_FILE}" "${backup_dir}/token.backup" 2>/dev/null || {
+                install_log "WARNING" "Failed to backup token file, but continuing"
+            }
+        fi
+        
+        # Set permissions on backup directory
+        if [ "$(id -u)" = "0" ]; then
+            chown -R root:root "${backup_dir}" || {
+                install_log "WARNING" "Failed to set permissions on backup directory, but continuing"
+            }
+            chmod -R 700 "${backup_dir}" || {
+                install_log "WARNING" "Failed to set permissions on backup files, but continuing"
+            }
+        fi
+        
+        install_log "INFO" "User data backup completed: ${backup_file}"
+    else
+        install_log "INFO" "No user configuration found to backup"
+    fi
+    
+    return 0
+}
+
+# Call main function and redirect output to the Synology-provided log file
+preuninst_main 2>&1 | tee -a "$SYNOPKG_TEMP_LOGFILE"

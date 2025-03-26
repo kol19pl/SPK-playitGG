@@ -33,6 +33,9 @@ done
 if [ -f "SPK_AP_TEMPLATE/install.sh" ]; then
     cp "SPK_AP_TEMPLATE/install.sh" "$workDir/" || { echo "⚠ Error copying install.sh."; exit 1; }
     echo "ℹ Plik install.sh skopiowany do struktury pakietu."
+    # Set executable permission for install.sh
+    chmod +x "$workDir/install.sh"
+    echo "ℹ Ustawiono uprawnienia do wykonywania dla install.sh."
 else
     echo "⚠ Plik install.sh nie znaleziony! Upewnij się, że plik jest obecny w katalogu SPK_AP_TEMPLATE."
 fi
@@ -45,9 +48,7 @@ cp -r SPK_AP_TEMPLATE/pakiet/. "$workDir/package" || { echo "⚠ Error copying p
 chown -R root:root "$workDir/scripts/" "$workDir/package/"
 chmod -R +x "$workDir/scripts/" "$workDir/package/"
 
-# Set executable permission for install.sh
-chmod +x "$workDir/install.sh"
-echo "ℹ Ustawiono uprawnienia do wykonywania dla install.sh."
+
 
 # Create package.tgz
 echo "📦 Tworzenie archiwum package.tgz..."
@@ -62,7 +63,7 @@ outputFile=$(pwd)/${packageName}.spk
 echo "📦 Tworzenie pakietu .spk: $outputFile"
 
 cd "$workDir"
-tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ conf/ install.sh $(ls PACKAGE_ICON*.PNG 2>/dev/null)
+tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ conf/  $(ls PACKAGE_ICON*.PNG 2>/dev/null)
 
 echo "✅ Pakiet utworzony: $outputFile"
 

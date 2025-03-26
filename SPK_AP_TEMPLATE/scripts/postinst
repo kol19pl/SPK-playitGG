@@ -1,3 +1,179 @@
 #!/bin/sh
-. $(dirname $0)/installer
-$(basename $0) > $SYNOPKG_TEMP_LOGFILE
+
+# Exit on error
+set -e
+
+# Source service-setup script to access shared functions and variables
+. "$(dirname "$0")/service-setup"
+
+# Main postinst function
+postinst_main() {
+    install_log "INFO" "Starting post-installation procedure for ${PACKAGE}"
+    
+    # Create service user
+    install_log "INFO" "Creating service user"
+    manage_service_user "create" || {
+        install_log "ERROR" "Failed to create service user"
+        exit 1
+    }
+    
+    # Initialize directories with proper permissions
+    install_log "INFO" "Setting up directory structure"
+    initialize_directories || {
+        install_log "ERROR" "Failed to initialize directories"
+        exit 1
+    }
+    
+    # Set permissions on installed files
+    install_log "INFO" "Setting permissions on installed files"
+    set_file_permissions || exit 1
+    
+    # Create symlinks
+    install_log "INFO" "Creating necessary symlinks"
+    create_symlinks || exit 1
+    
+    # Initialize configuration files
+    install_log "INFO" "Initializing configuration files"
+    initialize_configuration || exit 1
+    
+    # Run service-specific post-installation steps
+    service_postinst || {
+        install_log "ERROR" "Service post-installation steps failed"
+        exit 1
+    }
+    
+    install_log "INFO" "Post-installation completed successfully"
+    exit 0
+}
+
+# Set permissions on installed files
+set_file_permissions() {
+    install_log "INFO" "Setting permissions on application files"
+    
+    # Set executable permissions on binaries
+    if [ -d "${INSTALL_DIR}/bin" ]; then
+        install_log "INFO" "Setting executable permissions on binaries"
+        find "${INSTALL_DIR}/bin" -type f -exec chmod 755 {} \; || {
+            install_log "ERROR" "Failed to set permissions on binaries"
+            return 1
+        }
+        
+        # Set ownership of bin directory
+        if [ "$(id -u)" = "0" ]; then
+            chown -R "${USER}:${GROUP}" "${INSTALL_DIR}/bin" || {
+                install_log "ERROR" "Failed to set ownership on bin directory"
+                return 1
+            }
+        fi
+    else
+        install_log "WARNING" "Bin directory not found at ${INSTALL_DIR}/bin"
+    fi
+    
+    # Set permissions on configuration directory
+    set_permissions "${CONFIG_DIR}" "${USER}:${GROUP}" "0755" || {
+        install_log "ERROR" "Failed to set permissions on config directory"
+        return 1
+    }
+    
+    # Set permissions on data directory
+    set_permissions "${DATA_DIR}" "${USER}:${GROUP}" "0755" || {
+        install_log "ERROR" "Failed to set permissions on data directory"
+        return 1
+    }
+    
+    # Set permissions on log directory
+    set_permissions "${LOG_DIR}" "${USER}:${GROUP}" "0755" || {
+        install_log "ERROR" "Failed to set permissions on log directory"
+        return 1
+    }
+    
+    # Set restrictive permissions on token file if it exists
+    if [ -f "${TOKEN_FILE}" ]; then
+        set_permissions "${TOKEN_FILE}" "${USER}:${GROUP}" "0600" || {
+            install_log "WARNING" "Failed to set permissions on token file"
+        }
+    fi
+    
+    install_log "INFO" "File permissions set successfully"
+    return 0
+}
+
+# Create necessary symlinks
+create_symlinks() {
+    install_log "INFO" "Creating symlinks"
+    
+    # Create symlink in /usr/local/bin if it doesn't exist
+    USR_LOCAL_BIN="/usr/local/bin"
+    if [ -d "${USR_LOCAL_BIN}" ]; then
+        # Create symlink for the main executable
+        if [ -f "${INSTALL_DIR}/bin/playit-linux" ]; then
+            install_log "INFO" "Creating symlink for playit-linux in ${USR_LOCAL_BIN}"
+            ln -sf "${INSTALL_DIR}/bin/playit-linux" "${USR_LOCAL_BIN}/playit-gg" || {
+                install_log "WARNING" "Failed to create symlink in ${USR_LOCAL_BIN}, but continuing"
+            }
+        else
+            install_log "WARNING" "Main executable not found at ${INSTALL_DIR}/bin/playit-linux"
+        fi
+    else
+        install_log "WARNING" "Directory ${USR_LOCAL_BIN} does not exist, skipping symlink creation"
+    fi
+    
+    # Create symlink for the configuration file if needed
+    if [ ! -L "/etc/playit-gg" ] && [ -d "/etc" ]; then
+        install_log "INFO" "Creating symlink for configuration in /etc"
+        ln -sf "${CONFIG_DIR}" "/etc/playit-gg" || {
+            install_log "WARNING" "Failed to create symlink for configuration, but continuing"
+        }
+    fi
+    
+    return 0
+}
+
+# Initialize configuration files
+initialize_configuration() {
+    install_log "INFO" "Initializing configuration files"
+    
+    # Check if configuration file exists already
+    if [ -f "${CONFIG_FILE}" ]; then
+        install_log "INFO" "Configuration file already exists, skipping creation"
+    else
+        # Create default configuration file
+        install_log "INFO" "Creating default configuration file"
+        cat > "${CONFIG_FILE}" << EOF
+# PlayIt.GG Configuration
+# Generated: $(date "+%Y-%m-%d %H:%M:%S")
+# Edit this file to customize PlayIt.GG settings
+
+# Your PlayIt.GG token (if you have one)
+token: "${wizard_playit_token:-}"
+
+# Logging settings
+log_level: "info"
+
+# Service settings
+#bind_addr: "0.0.0.0:${SERVICE_PORT}"
+EOF
+        
+        # Set proper permissions on configuration file
+        set_permissions "${CONFIG_FILE}" "${USER}:${GROUP}" "0600" || {
+            install_log "ERROR" "Failed to set permissions on configuration file"
+            return 1
+        }
+        
+        install_log "INFO" "Default configuration file created successfully"
+    fi
+    
+    # Generate secret key if it doesn't exist
+    if [ ! -f "${SECRET_KEY_FILE}" ]; then
+        install_log "INFO" "Generating secret key"
+        get_secret_key >/dev/null || {
+            install_log "ERROR" "Failed to generate secret key"
+            return 1
+        }
+    fi
+    
+    return 0
+}
+
+# Call main function and redirect output to the Synology-provided log file
+postinst_main 2>&1 | tee -a "$SYNOPKG_TEMP_LOGFILE"
