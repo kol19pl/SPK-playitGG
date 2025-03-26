@@ -1,29 +1,23 @@
-package=playitGG
-version=v1.1
+package="playitGG"
+version="2025.1.0-16"
 os_min_ver="1.0-40000"
-os_max_ver="8.2.2-70000"
 description="playit.gg"
-arch="x86_64 armv7 armv8 ipq806x northstarplus"
+
+arch="apollolake avoton braswell broadwell broadwellnk broadwellntbap bromolow cedarview denverton dockerx64 geminilake grantley purley kvmx64 v1000 x86 x86_64"
 version_installer="1.0"
-dsmappname="SYNO.SDS.playit.gg.Application"
+
 maintainer="Kol19pl"
-startable="yes"
-install_path="/volume1/@appstore/playitGG"
-displayname="playit.gg"
-maintainer_url="https://github.com/kol19pl/SRM-Pihole/tree/main"
-support_url="https://github.com/kol19pl/SRM-Pihole/tree/main"
-helpurl="https://github.com/kol19pl/SRM-Pihole/tree/main"
+
+maintainer_url="https://github.com/karasevm"
+distributor="kol19pl"
+distributor_url="https://synocommunity.com"
+os_min_ver="6.0-25556"
+helpurl="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/"
+displayname="playitGG"
+dsmappname="com.kol.packages.playitGG"
+changelog="setup"
+
 beta="no"
-install_replace_packages="playitGG"
-install_conflict_packages="playitGG"
-install_replace_force_packages="playitGG"
-silent_install="no"
-depends=""
-log_dir="/var/log/playitgg"
-user="root"
-group="administrators"
-post_install_message="Instalacja zakończona pomyślnie!"
 
 
 description_plk="playit.gg :)"
-
