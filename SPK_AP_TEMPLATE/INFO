@@ -3,7 +3,7 @@ version="2025.1.0-16"
 os_min_ver="1.0-40000"
 description="playit.gg"
 
-arch="apollolake avoton braswell broadwell broadwellnk broadwellntbap bromolow cedarview denverton dockerx64 geminilake grantley purley kvmx64 v1000 x86 x86_64"
+arch="apollolake avoton braswell broadwell broadwellnk broadwellntbap bromolow cedarview denverton dockerx64 geminilake grantley purley kvmx64 v1000 x86 x86_64 northstarplus ipq806x  armv7 armv8"
 version_installer="1.0"
 
 maintainer="Kol19pl"
