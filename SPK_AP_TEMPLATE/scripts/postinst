@@ -8,16 +8,91 @@
 
 echo "Post-install script running..."
 
-# Utwórz foldery jeśli nie istnieją
-INSTALL_DIR="/var/packages/playit/target"
-BIN_DIR="$INSTALL_DIR/bin"
-VAR_DIR="$INSTALL_DIR/var"
+# Path to this script
+ScriptDir="$(dirname "$0")"
 
-mkdir -p "$BIN_DIR"
-mkdir -p "$VAR_DIR"
+# Set Prefs
+SetPref()
+{
+  local PrefXml="$playitGGPkgHome/playitGG/Preferences.xml"
+
+  # Add only if it doesn't already exist
+  if ! grep "$1" "$PrefXml"  1>/dev/null 2>/dev/null ;  then
+    sed -i "s;/>; $1=\""$2"\"/>;" "$PrefXml"
+  fi
+
+}
+
+
+# Where is the shared folder?
+playitPkgShare="/var/packages/playit/shares/playit"
+playitGGPkgHome="$playitPkgShare/AppData"
+
+# Must minimally have a tmp directory before
+mkdir -p $playitGGPkgHome/tmp
+
+
+
+# In event not provided
+[ "$SYNOPKG_PKGHOME" = "" ] && SYNOPKG_PKGHOME=/var/packages/playitGG/home
+[ "$SYNOPKG_PKGDEST" = "" ] && SYNOPKG_PKGDEST=/var/packages/playitGG/target
+[ "$SYNOPKG_PKGTMP"  = "" ] && SYNOPKG_PKGTMP=/var/packages/playitGG/tmp
+[ "$SYNOPKG_TEMP_LOGFILE" = "" ] && SYNOPKG_TEMP_LOGFILE=/dev/tty
+
+
+
+# Make certain destination writeable
+if [ ! -w "$playitPkgShare" ]; then
+  # Brief message - Cannot write to shared folder
+  {
+    echo "<br><STRONG>ERROR: <strong>System Internal User PlexMediaServer cannot write to shared folder PlexMediaServer</strong>.<br>"
+    echo "<br><STRONG>El usuario interno del sistema PlexMediaServer no puede escribir en la carpeta compartida PlexMediaServer</strong>.<br>"
+    echo "<br><STRONG>L'utilisateur interne du système PlexMediaServer ne peut pas écrire dans le dossier partagé PlexMediaServer</strong>.<br>"
+    echo "<br><STRONG>Systeminterner Benutzer PlexMediaServer kann nicht in den freigegebenen Ordner PlexMediaServer schreiben</strong>.<br>"
+    echo "<br><STRONG>システム内部ユーザーPlexMediaServerは共有フォルダーPlexMediaServerrに書き込めません</strong>.<br>"
+    echo "<br><STRONG>시스템 내부 사용자 PlexMediaServer는 공유 폴더 PlexMediaServer에 쓸 수 없습니다.</strong>.<br>"
+    echo "<br><STRONG>系统内部用户 PlexMediaServer 无法写入共享文件夹 PlexMediaServer</strong>.</p><br>"
+  } >> "$SYNOPKG_TEMP_LOGFILE"
+  exit 150
+fi
+
+# Create AppData (and tmp)
+[ ! -d "$playitGGPkgHome" ] && rm -f "$playitGGPkgHome"
+mkdir -p "$playitGGPkgHome/tmp"
+if [ ! -d "$playitGGPkgHome" ]; then
+
+  # Brief message - Cannot write to shared folder
+  {
+    echo "<br><STRONG>ERROR: <strong>System Internal User PlexMediaServer cannot write to shared folder PlexMediaServer</strong>.</p><br>"
+    echo "<br><STRONG><strong>El usuario interno del sistema PlexMediaServer no puede escribir en la carpeta compartida PlexMediaServer</strong>.</p><br>"
+    echo "<br><STRONG><strong>L'utilisateur interne du système PlexMediaServer ne peut pas écrire dans le dossier partagé PlexMediaServer</strong>.</p><br>"
+    echo "<br><STRONG><strong>Systeminterner Benutzer PlexMediaServer kann nicht in den freigegebenen Ordner PlexMediaServer schreiben</strong>.</p><br>"
+    echo "<br><STRONG><strong>システム内部ユーザーPlexMediaServerは共有フォルダーPlexMediaServerに書き込めません</strong>.</p><br>"
+    echo "<br><STRONG><strong>시스템 내부 사용자 PlexMediaServer는 공유 폴더 PlexMediaServer에 쓸 수 없습니다.</strong>.</p><br>"
+    echo "<br><STRONG><strong>系统内部用户 PlexMediaServer 无法写入共享文件夹 PlexMediaServer</strong>.</p><br>"
+  } >>$SYNOPKG_TEMP_LOGFILE
+  exit 150
+fi
+
+
+
+
+
+# Remove logfile redirection
+rm -f "$playitGGPkgHome/LogDir"
+
+touch "$playitPkgShare/Please do not place any media files here."
+
+# Utwórz foldery jeśli nie istnieją
+#INSTALL_DIR="/var/packages/playit/target"
+#BIN_DIR="$INSTALL_DIR/bin"
+#VAR_DIR="$INSTALL_DIR/var"
+
+#mkdir -p "$BIN_DIR"
+#mkdir -p "$VAR_DIR"
 
 # Ustawienia uprawnień
-chmod +x "$BIN_DIR/playit-linux-amd64"
+#chmod +x "$BIN_DIR/playit-linux-amd64"
 
 # Zakończ sukcesem
 exit 0

@@ -1,9 +1,9 @@
-package=playitGG
+package="playitGG"
 version=v1.1
 os_min_ver="1.0-40000"
 os_max_ver="7.2-70000"
 description="playit.gg"
-arch="x86_64 armv7 armv8 ipq806x northstarplus"
+arch="x86_64"
 version_installer="1.0"
 dsmappname="SYNO.SDS.playit.gg.Application"
 maintainer="Kol19pl"

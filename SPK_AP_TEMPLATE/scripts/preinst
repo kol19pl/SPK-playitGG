@@ -4,5 +4,10 @@
 ### This script will be execute when package installed and upgraded.
 ### Actions before package installed.
 ### ex. check environment.
+# Path to this script
+ScriptDir="$(dirname "$0")"
+
+
+
 
 exit 0

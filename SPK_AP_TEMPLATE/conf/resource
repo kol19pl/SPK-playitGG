@@ -1,5 +1,14 @@
 {
     "usr-local-linker": {
         "bin": ["usr/local/bin/playit-linux"]
-    }
+    },
+    "data-share": {
+		"shares": [{
+			"name": "PlexMediaServer",
+			"permission": {
+				"rw": ["PlexMediaServer"]
+			}
+		}],
+		"once": "false"
+	}
 }
