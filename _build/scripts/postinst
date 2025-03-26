@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Exit on error
+#set -e
+
+# Package destination directory
+#INSTALL_DIR="/var/packages/playitgg/target"
+
+
+# Set permissions for var directory
+#chown "$SYNOPKG_PKGINST_USER": "$SYNOPKG_PKGVAR"
+
+# Set executable permissions for the binary
+#chmod 755 "$INSTALL_DIR/bin/playit-linux"
+#chown "$SYNOPKG_PKGINST_USER": "$INSTALL_DIR/bin/playit-linux"
+
+# Set proper ownership for all files
+#chown -R "$SYNOPKG_PKGINST_USER": "$INSTALL_DIR"
+
+# Create symbolic link if needed
+# ln -sf "$INSTALL_DIR/bin/playit-linux" /usr/local/bin/playit
+
+
+
+exit 0
+
