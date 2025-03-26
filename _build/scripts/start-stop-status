@@ -13,10 +13,10 @@ PLAYIT_SECRET="c113ce3d302ac279f60912ceae77c31d686179b3462073dc3f71ac6ed84e090f"
 if [[ ! "$SYNOPKG_DSM_VERSION_MAJOR" =~ ^[0-9]+$ ]] || [ "$SYNOPKG_DSM_VERSION_MAJOR" -lt 7 ]; then
     # DSM 6 i starsze
     SYNOPKG_PKGVAR="${SYNOPKG_PKGDEST}/var"
-    RUN_AS="root"  # Na DSM 6 usługi działają jako root
+    RUN_AS="playitgg"  # Na DSM 6 usługi działają jako root
 else
     # DSM 7+
-    RUN_AS="${EFF_USER}"
+    EFF_USER="playitgg"
 fi
 
 # Sprawdzenie, czy binarka playit-linux istnieje

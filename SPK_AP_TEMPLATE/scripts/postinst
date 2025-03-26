@@ -16,9 +16,17 @@ if ! id "${PACKAGE_USER}" >/dev/null 2>&1; then
     fi
 fi
 
+mkdir -p /var/packages/playitGG/var
+chown playitgg:playitGG /var/packages/playitGG/var
+chmod 755 /var/packages/playitGG/var
+touch /var/packages/playitGG/var/playitGG.log
+chown playitgg:playitGG /var/packages/playitGG/var/playitGG.log
+chmod 664 /var/packages/playitGG/var/playitGG.log
+
+
 # Zmiana właściciela i uprawnień katalogu pakietu
-chown -R ${PACKAGE_USER}:users ${PACKAGE_DIR}
-chmod -R 750 ${PACKAGE_DIR}
+#chown -R ${PACKAGE_USER}:users ${PACKAGE_DIR}
+#chmod -R 750 ${PACKAGE_DIR}
 
 exit 0
 
