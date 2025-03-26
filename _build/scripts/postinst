@@ -1,26 +1,24 @@
 #!/bin/sh
 
-# Exit on error
-#set -e
+PACKAGE_USER="playitgg"
+PACKAGE_DIR="/var/packages/playitgg"
 
-# Package destination directory
-#INSTALL_DIR="/var/packages/playitgg/target"
+# Sprawdzenie wersji DSM
+DSM_VERSION=$(get_key_value /etc.defaults/VERSION majorversion)
 
+# Sprawdzenie, czy użytkownik istnieje
+if ! id "${PACKAGE_USER}" >/dev/null 2>&1; then
+    echo "Tworzenie użytkownika ${PACKAGE_USER}..."
+    if [ "${DSM_VERSION}" -ge 7 ]; then
+        synouser --add "${PACKAGE_USER}" "SecureRandomPass123!" 0 "" "" > /dev/null
+    else
+        adduser -h "${PACKAGE_DIR}" -G users -S "${PACKAGE_USER}"
+    fi
+fi
 
-# Set permissions for var directory
-#chown "$SYNOPKG_PKGINST_USER": "$SYNOPKG_PKGVAR"
-
-# Set executable permissions for the binary
-#chmod 755 "$INSTALL_DIR/bin/playit-linux"
-#chown "$SYNOPKG_PKGINST_USER": "$INSTALL_DIR/bin/playit-linux"
-
-# Set proper ownership for all files
-#chown -R "$SYNOPKG_PKGINST_USER": "$INSTALL_DIR"
-
-# Create symbolic link if needed
-# ln -sf "$INSTALL_DIR/bin/playit-linux" /usr/local/bin/playit
-
-
+# Zmiana właściciela i uprawnień katalogu pakietu
+chown -R ${PACKAGE_USER}:users ${PACKAGE_DIR}
+chmod -R 750 ${PACKAGE_DIR}
 
 exit 0
 

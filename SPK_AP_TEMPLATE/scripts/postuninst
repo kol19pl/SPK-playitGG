@@ -1,0 +1,48 @@
+#!/bin/sh
+
+PACKAGE_USER="playitgg"
+
+# Funkcja usuwająca grupę, jeśli jest pusta
+syno_group_remove () {
+    RM_GROUP=$1
+    if [ -n "${RM_GROUP}" ]; then
+        # Sprawdzenie, czy grupa jest pusta
+        if ! synogroup --get "${RM_GROUP}" | grep -q "0:\["; then
+            echo "Usuwanie grupy ${RM_GROUP}"
+            synogroup --del "${RM_GROUP}"
+            synogroup --rebuild all
+        fi
+    fi
+}
+
+# Funkcja usuwająca użytkownika
+syno_remove_user () {
+    RM_USER=$1
+    if [ -n "${RM_USER}" ]; then
+        echo "Usuwanie użytkownika ${RM_USER}"
+        synouser --del "${RM_USER}"
+    fi
+}
+
+# Sprawdzenie, czy pakiet jest odinstalowywany
+if [ "${SYNOPKG_PKG_STATUS}" = "UNINSTALL" ]; then
+    # Usunięcie konfiguracji firewall
+    if [ -r "${FWPORTS_FILE}" ]; then
+        echo "Usuwanie konfiguracji firewall dla ${SYNOPKG_PKGNAME}"
+        servicetool --remove-configure-file --package "${SYNOPKG_PKGNAME}.sc"
+    fi
+
+    # Usunięcie linku symbolicznego
+    rm -rf "/usr/local/${SYNOPKG_PKGNAME}"
+
+    # Usunięcie grupy użytkownika, jeśli jest pusta
+    syno_group_remove "${GROUP}"
+
+    # Usunięcie użytkownika pakietu
+    syno_remove_user "${PACKAGE_USER}"
+
+    # Usunięcie zmiennych instalacyjnych
+    rm -f "${INST_VARIABLES}"
+fi
+
+exit 0

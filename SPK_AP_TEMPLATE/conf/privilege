@@ -2,7 +2,7 @@
   "defaults": {
     "run-as": "package"
   },
-  "username": "sc-cloudflared",
+  "username": "playitgg",
   "ctrl-script": [
     {
       "action": "preinst",

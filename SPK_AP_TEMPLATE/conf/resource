@@ -1,1 +1,5 @@
-{}
+{
+    "usr-local-linker": {
+        "bin": ["usr/local/bin/playit-linux"]
+    }
+}

@@ -1,0 +1,65 @@
+#!/bin/sh
+# Copyright (C) 2000-2024 Synology Inc. All rights reserved.
+
+PACKAGE_USER="playitgg"
+GROUP="playitgroup"
+GROUP_DESC="Playit GG Service Group"
+SHARE_NAME="PlayitGG"
+SYNOPKG_PKGNAME="playit"
+DSM_VERSION=$(get_key_value /etc.defaults/VERSION majorversion)
+
+install_log() {
+    echo "[INSTALL] $1"
+}
+
+# Sprawdzenie wersji DSM
+echo "Detected DSM Version: ${DSM_VERSION}"
+
+# Tworzenie grupy
+if ! synogroup --get "${GROUP}" >/dev/null 2>&1; then
+    echo "Creating group: ${GROUP}"
+    synogroup --add "${GROUP}" "${PACKAGE_USER}"
+    synogroup --descset "${GROUP}" "${GROUP_DESC}"
+fi
+
+# Tworzenie użytkownika (różne podejścia dla DSM 6 i 7)
+if ! id "${PACKAGE_USER}" >/dev/null 2>&1; then
+    if [ "${DSM_VERSION}" -ge 7 ]; then
+        synouser --add "${PACKAGE_USER}" "" "${PACKAGE_USER}" 0 "" 0
+    else
+        synouser --add "${PACKAGE_USER}" "SecureRandomPass123!" 0 "" ""
+    fi
+    echo "User ${PACKAGE_USER} created."
+else
+    echo "User ${PACKAGE_USER} already exists."
+fi
+
+# Przypisanie użytkownika do grupy
+synogroup --member "${GROUP}" "${PACKAGE_USER}"
+
+# Ustawienia uprawnień katalogu aplikacji
+set_syno_permissions() {
+    DIRNAME=$1
+    if [ "${DSM_VERSION}" -ge 6 ]; then
+        synoacltool -add "${DIRNAME}" "group:${GROUP}:allow:rwxpdDaARWcC-:fd--"
+        find "${DIRNAME}" -type d -exec synoacltool -enforce-inherit "{}" \;
+    else
+        chown -R ${PACKAGE_USER}:root "${DIRNAME}"
+        chmod -R 775 "${DIRNAME}"
+    fi
+}
+
+# Tworzenie udziału sieciowego (jeśli nie istnieje)
+if ! synoshare --get "${SHARE_NAME}" >/dev/null 2>&1; then
+    SHARE_PATH="/volume1/${SHARE_NAME}"
+    echo "Creating shared folder: ${SHARE_PATH}"
+    synoshare --add "${SHARE_NAME}" "PlayitGG Storage" "${SHARE_PATH}" "" "" "" 1 0
+else
+    echo "Shared folder ${SHARE_NAME} already exists."
+fi
+
+# Nadanie uprawnień do folderu
+set_syno_permissions "/volume1/${SHARE_NAME}"
+
+exit 0
+

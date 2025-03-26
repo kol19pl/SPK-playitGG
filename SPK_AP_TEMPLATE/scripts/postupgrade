@@ -1,0 +1,25 @@
+#!/bin/sh
+# Copyright (C) 2000-2020 Synology Inc. All rights reserved.
+
+### This script will be executed ONLY at package upgraded.
+### Actions after package upgraded.
+
+PACKAGE_USER="playitgg"
+
+# Funkcja ustawiająca uprawnienia
+set_unix_permissions () {
+    DIRNAME=$1
+    if [ -n "${PACKAGE_USER}" ]; then
+        echo "Ustawianie uprawnień dla ${PACKAGE_USER} w ${DIRNAME}"
+        chown -R ${PACKAGE_USER}:root "${DIRNAME}"
+        chmod -R 750 "${DIRNAME}"
+    fi
+}
+
+# Ustawienie poprawnych uprawnień dla katalogu var
+if [ -n "${SYNOPKG_PKGVAR}" ]; then
+    set_unix_permissions "${SYNOPKG_PKGVAR}"
+fi
+
+exit 0
+

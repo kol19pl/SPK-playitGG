@@ -1,0 +1,109 @@
+#!/bin/sh
+
+# Nazwa pakietu
+PACKAGE="playitGG"
+DNAME="${SYNOPKG_PKGNAME}"
+LOG_FILE="${SYNOPKG_PKGVAR}/${SYNOPKG_PKGNAME}.log"
+INSTALL_DIR="/var/packages/${PACKAGE}/target"
+PID_FILE="${INSTALL_DIR}/playit.pid"
+PLAYIT_BIN="${INSTALL_DIR}/bin/playit-linux"
+PLAYIT_SECRET="c113ce3d302ac279f60912ceae77c31d686179b3462073dc3f71ac6ed84e090f"
+
+# Sprawdzenie wersji DSM
+if [ -z "$SYNOPKG_DSM_VERSION_MAJOR" ] || [ "$SYNOPKG_DSM_VERSION_MAJOR" -lt 7 ]; then
+    # DSM 6 i starsze
+    SYNOPKG_PKGVAR="${SYNOPKG_PKGDEST}/var"
+    RUN_AS="root"  # Na DSM 6 usługi działają jako root
+else
+    # DSM 7+
+    RUN_AS="${EFF_USER}"
+fi
+
+# Sprawdzenie, czy binarka playit-linux istnieje
+if [ ! -f "$PLAYIT_BIN" ]; then
+    echo "Błąd: Nie znaleziono $PLAYIT_BIN" >> "$LOG_FILE"
+    exit 1
+fi
+
+# Nadanie uprawnień do uruchamiania
+chmod +x "$PLAYIT_BIN"
+
+# Sprawdzenie sekretu
+if [ -z "${PLAYIT_SECRET}" ]; then
+    echo "Błąd: PLAYIT_SECRET nie jest ustawiony" >> "$LOG_FILE"
+    exit 1
+fi
+
+# Komenda uruchamiająca
+SERVICE_COMMAND="${PLAYIT_BIN} --secret ${PLAYIT_SECRET}"
+
+start_daemon() {
+    echo "Uruchamianie ${DNAME}..." >> "$LOG_FILE"
+
+    if [ -f "$PID_FILE" ]; then
+        echo "Błąd: ${DNAME} już działa!" >> "$LOG_FILE"
+        exit 1
+    fi
+
+    if [ "$SYNOPKG_DSM_VERSION_MAJOR" -lt 7 ]; then
+        # DSM 6 i starsze: uruchamiamy jako root lub inny użytkownik
+        su - "$RUN_AS" -s /bin/sh -c "nohup $SERVICE_COMMAND >> \"$LOG_FILE\" 2>&1 & echo \$! > \"$PID_FILE\""
+    else
+        # DSM 7+: Uruchamianie bez su
+        nohup $SERVICE_COMMAND >> "$LOG_FILE" 2>&1 &
+        echo $! > "$PID_FILE"
+    fi
+
+    echo "${DNAME} uruchomiony z PID $(cat $PID_FILE)" >> "$LOG_FILE"
+}
+
+stop_daemon() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        echo "Zatrzymywanie ${DNAME} (PID: $PID)..." >> "$LOG_FILE"
+        kill "$PID" 2>/dev/null
+        sleep 2
+        if ps -p "$PID" > /dev/null 2>&1; then
+            echo "Proces nadal działa, wymuszanie zamknięcia..." >> "$LOG_FILE"
+            kill -9 "$PID"
+        fi
+        rm -f "$PID_FILE"
+        echo "${DNAME} zatrzymany." >> "$LOG_FILE"
+    else
+        echo "Błąd: Brak PID, prawdopodobnie ${DNAME} nie działa." >> "$LOG_FILE"
+    fi
+}
+
+daemon_status() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p "$PID" > /dev/null 2>&1; then
+            echo "${DNAME} działa (PID: $PID)"
+            exit 0
+        fi
+    fi
+    echo "${DNAME} nie działa"
+    exit 1
+}
+
+case $1 in
+    start)
+        start_daemon
+        ;;
+    stop)
+        stop_daemon
+        ;;
+    status)
+        daemon_status
+        ;;
+    log)
+        tail -n 100 "$LOG_FILE"
+        ;;
+    *)
+        echo "Użycie: $0 {start|stop|status|log}"
+        exit 1
+        ;;
+esac
+
+exit 0
+

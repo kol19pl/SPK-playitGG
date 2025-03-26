@@ -6,6 +6,11 @@ workDir=$(pwd)/_build
 rm -rf "$workDir"
 mkdir -p "$workDir"
 
+# Funkcja do naprawy kodowania plików
+fix_line_endings() {
+    find "$1" -type f -exec sed -i 's/\r$//' {} +
+}
+
 # Check if SPK_AP_TEMPLATE exists
 if [ ! -d "SPK_AP_TEMPLATE" ]; then
     echo "ℹ SPK_AP_TEMPLATE folder not found. Please create it with the required INFO file."
@@ -18,6 +23,9 @@ packageName=$(grep '^package=' "SPK_AP_TEMPLATE/INFO" | cut -d'=' -f2 | sed 's/"
 # Copy necessary files
 echo "ℹ Skrypty startowe skopiowane"
 cp -R SPK_AP_TEMPLATE/{INFO,service-cfg,scripts,WIZARD_UIFILES,conf} "$workDir/" || { echo "⚠ Error copying necessary files."; exit 1; }
+
+# Fix line endings for copied files
+fix_line_endings "$workDir"
 
 # Copy icons if they exist
 for icon in SPK_AP_TEMPLATE/PACKAGE_ICON*.PNG; do
@@ -33,6 +41,8 @@ if [ -f "SPK_AP_TEMPLATE/install.sh" ]; then
     # Set executable permission for install.sh
     chmod +x "$workDir/install.sh"
     echo "ℹ Ustawiono uprawnienia do wykonywania dla install.sh."
+    # Fix line endings for install.sh
+    fix_line_endings "$workDir/install.sh"
 else
     echo "⚠ Plik install.sh nie znaleziony! Upewnij się, że plik jest obecny w katalogu SPK_AP_TEMPLATE."
 fi
@@ -41,9 +51,8 @@ fi
 mkdir -p "$workDir/package"
 cp -r SPK_AP_TEMPLATE/pakiet/. "$workDir/package" || { echo "⚠ Error copying package content."; exit 1; }
 
-
-
-
+# Fix line endings for package files
+fix_line_endings "$workDir/package"
 
 # Create package.tgz
 echo "📦 Tworzenie archiwum package.tgz..."
@@ -58,10 +67,11 @@ outputFile=$(pwd)/${packageName}.spk
 echo "📦 Tworzenie pakietu .spk: $outputFile"
 
 cd "$workDir"
-tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ WIZARD_UIFILES/ conf/   $(ls PACKAGE_ICON*.PNG 2>/dev/null)
+tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ WIZARD_UIFILES/ conf/ $(ls PACKAGE_ICON*.PNG 2>/dev/null)
 
 echo "✅ Pakiet utworzony: $outputFile"
 
 # Clean up
 #rm -rf "$workDir"
 echo "🧹 Usunięto katalog roboczy: $workDir"
+
