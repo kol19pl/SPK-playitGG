@@ -13,14 +13,11 @@ if [ ! -d "SPK_AP_TEMPLATE" ]; then
 fi
 
 # Read package name from INFO file
-if ! packageName=$(grep '^package=' "SPK_AP_TEMPLATE/INFO" | cut -d'=' -f2 | sed 's/"//g' | tr -d ' '); then
-    echo "⚠ Error: Could not read package name from INFO file."
-    exit 1
-fi
+packageName=$(grep '^package=' "SPK_AP_TEMPLATE/INFO" | cut -d'=' -f2 | sed 's/"//g' | tr -d ' ')
 
 # Copy necessary files
 echo "ℹ Skrypty startowe skopiowane"
-cp -R SPK_AP_TEMPLATE/{INFO,service-cfg,scripts,conf} "$workDir/" || { echo "⚠ Error copying necessary files."; exit 1; }
+cp -R SPK_AP_TEMPLATE/{INFO,service-cfg,scripts,WIZARD_UIFILES,conf} "$workDir/" || { echo "⚠ Error copying necessary files."; exit 1; }
 
 # Copy icons if they exist
 for icon in SPK_AP_TEMPLATE/PACKAGE_ICON*.PNG; do
@@ -44,9 +41,7 @@ fi
 mkdir -p "$workDir/package"
 cp -r SPK_AP_TEMPLATE/pakiet/. "$workDir/package" || { echo "⚠ Error copying package content."; exit 1; }
 
-# Set executable permissions
-chown -R root:root "$workDir/scripts/" "$workDir/package/"
-chmod -R +x "$workDir/scripts/" "$workDir/package/"
+
 
 
 
@@ -57,16 +52,16 @@ ls -la "$workDir/package"
 cd "$workDir/package"
 tar -czf "$workDir/package.tgz" *
 cd .. || { echo "⚠ Error navigating back to the work directory."; exit 1; }
-
+cd ..
 # Create final .spk package
 outputFile=$(pwd)/${packageName}.spk
 echo "📦 Tworzenie pakietu .spk: $outputFile"
 
 cd "$workDir"
-tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ conf/  $(ls PACKAGE_ICON*.PNG 2>/dev/null)
+tar -cf "$outputFile" INFO service-cfg package.tgz scripts/ WIZARD_UIFILES/ conf/   $(ls PACKAGE_ICON*.PNG 2>/dev/null)
 
 echo "✅ Pakiet utworzony: $outputFile"
 
 # Clean up
-rm -rf "$workDir"
+#rm -rf "$workDir"
 echo "🧹 Usunięto katalog roboczy: $workDir"
